@@ -1,5 +1,5 @@
-[programs.localnet]
-vault = "stdcqm7Cc8Bj1JZfBPYY8Hyzqqjabm7ugk6k74QEm1B"
+[programs.devnet]
+vault = "Cw4xY7rsYrsY15WxHi8wy7ZD2G7cp3TKxGZiwD28zMAe"
 
 [registry]
 url = "https://anchor.projectserum.com"

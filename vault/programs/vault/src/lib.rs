@@ -19,7 +19,7 @@ use crate::zeta_constants::*;
 use crate::zeta_utils::*;
 use constants::*;
 
-declare_id!("stdcqm7Cc8Bj1JZfBPYY8Hyzqqjabm7ugk6k74QEm1B");
+declare_id!("Cw4xY7rsYrsY15WxHi8wy7ZD2G7cp3TKxGZiwD28zMAe");
 
 #[program]
 pub mod vault {
@@ -162,147 +162,6 @@ pub mod vault {
 
         Ok(())
     }
-
-    pub fn initialize_zeta_margin_account(
-        ctx: Context<InitializeZetaMarginAccount>,
-    ) -> ProgramResult {
-        let vault_name = ctx.accounts.vault.vault_name.as_ref();
-        let seeds = vault_authority_seeds!(
-            vault_name = vault_name,
-            bump = ctx.accounts.vault.bumps.vault_authority
-        );
-        zeta_client::initialize_margin_account(
-            ctx.accounts.zeta_program.clone(),
-            ctx.accounts.initialize_margin_cpi_accounts.clone(),
-            seeds,
-        )
-    }
-
-    pub fn deposit_zeta(ctx: Context<DepositZeta>, amount: u64) -> ProgramResult {
-        let vault_name = ctx.accounts.vault.vault_name.as_ref();
-        let seeds = vault_authority_seeds!(
-            vault_name = vault_name,
-            bump = ctx.accounts.vault.bumps.vault_authority
-        );
-        msg!("Deposit into zeta margin account");
-        zeta_client::deposit(
-            ctx.accounts.zeta_program.clone(),
-            ctx.accounts.deposit_cpi_accounts.clone(),
-            seeds,
-            amount,
-        )
-    }
-
-    pub fn withdraw_zeta(ctx: Context<WithdrawZeta>, amount: u64) -> ProgramResult {
-        let vault_name = ctx.accounts.vault.vault_name.as_ref();
-        let seeds = vault_authority_seeds!(
-            vault_name = vault_name,
-            bump = ctx.accounts.vault.bumps.vault_authority
-        );
-        msg!("Withdraw from zeta margin account");
-        zeta_client::withdraw(
-            ctx.accounts.zeta_program.clone(),
-            ctx.accounts.withdraw_cpi_accounts.clone(),
-            seeds,
-            amount,
-        )
-    }
-
-    pub fn initialize_zeta_open_orders(ctx: Context<InitializeZetaOpenOrders>) -> ProgramResult {
-        let vault_name = ctx.accounts.vault.vault_name.as_ref();
-        let seeds = vault_authority_seeds!(
-            vault_name = vault_name,
-            bump = ctx.accounts.vault.bumps.vault_authority
-        );
-        msg!("Initialize zeta open orders account");
-        zeta_client::initialize_open_orders(
-            ctx.accounts.zeta_program.clone(),
-            ctx.accounts.initialize_open_orders_cpi_accounts.clone(),
-            seeds,
-        )
-    }
-
-    // TODO: in future move this on-chain
-    pub fn place_auction_order(
-        ctx: Context<PlaceAuctionOrder>,
-        price: u64,
-        size: u64,
-        side: Side,
-        client_order_id: Option<u64>,
-    ) -> ProgramResult {
-        msg!("PLACE AUCTION ORDER");
-        let vault_name = ctx.accounts.vault.vault_name.as_ref();
-        let seeds = vault_authority_seeds!(
-            vault_name = vault_name,
-            bump = ctx.accounts.vault.bumps.vault_authority
-        );
-        zeta_client::place_order(
-            ctx.accounts.zeta_program.clone(),
-            ctx.accounts.place_order_cpi_accounts.clone(),
-            seeds,
-            price,
-            size,
-            side,
-            client_order_id,
-        )
-    }
-
-    pub fn cancel_auction_order(
-        ctx: Context<CancelAuctionOrder>,
-        side: Side,
-        order_id: u128,
-    ) -> ProgramResult {
-        msg!("CANCEL AUCTION ORDER");
-        let vault_name = ctx.accounts.vault.vault_name.as_ref();
-        let seeds = vault_authority_seeds!(
-            vault_name = vault_name,
-            bump = ctx.accounts.vault.bumps.vault_authority
-        );
-        zeta_client::cancel_order(
-            ctx.accounts.zeta_program.clone(),
-            ctx.accounts.cancel_order_cpi_accounts.clone(),
-            seeds,
-            side,
-            order_id,
-        )
-    }
-
-    #[access_control(epoch_over(&ctx.accounts.vault))]
-    pub fn rollover_vault(ctx: Context<RolloverVault>) -> ProgramResult {
-        msg!("Roll over vault");
-        let vault = &mut ctx.accounts.vault;
-        vault.epoch_times.start_epoch = vault
-            .epoch_times
-            .start_epoch
-            .checked_add(vault.epoch_times.epoch_cadence as i64)
-            .unwrap();
-        vault.epoch_times.end_deposits = vault
-            .epoch_times
-            .end_deposits
-            .checked_add(vault.epoch_times.epoch_cadence as i64)
-            .unwrap();
-        vault.epoch_times.start_auction = vault
-            .epoch_times
-            .start_auction
-            .checked_add(vault.epoch_times.epoch_cadence as i64)
-            .unwrap();
-        vault.epoch_times.end_auction = vault
-            .epoch_times
-            .end_auction
-            .checked_add(vault.epoch_times.epoch_cadence as i64)
-            .unwrap();
-        vault.epoch_times.start_settlement = vault
-            .epoch_times
-            .start_settlement
-            .checked_add(vault.epoch_times.epoch_cadence as i64)
-            .unwrap();
-        vault.epoch_times.end_epoch = vault
-            .epoch_times
-            .end_epoch
-            .checked_add(vault.epoch_times.epoch_cadence as i64)
-            .unwrap();
-        Ok(())
-    }
 }
 
 #[macro_export]
@@ -311,7 +170,11 @@ macro_rules! vault_authority_seeds {
         vault_name = $vault_name:expr,
         bump = $bump:expr
     ) => {
-        &[VAULT_AUTHORITY_SEED.as_bytes(), $vault_name.strip(), &[$bump]]
+        &[
+            VAULT_AUTHORITY_SEED.as_bytes(),
+            $vault_name.strip(),
+            &[$bump],
+        ]
     };
 }
 
@@ -400,37 +263,6 @@ fn deposit_withdraw_phase(vault: &Vault) -> ProgramResult {
         return Err(ErrorCode::StartEpochTime.into());
     } else if clock.unix_timestamp > vault.epoch_times.end_deposits {
         return Err(ErrorCode::EndDepositsTime.into());
-    }
-    Ok(())
-}
-
-// Asserts the vault is ready to hold an auction.
-fn auction_phase(vault: &Vault) -> ProgramResult {
-    let clock = Clock::get()?;
-    if clock.unix_timestamp <= vault.epoch_times.start_auction {
-        return Err(ErrorCode::StartAuctionTime.into());
-    } else if clock.unix_timestamp > vault.epoch_times.end_auction {
-        return Err(ErrorCode::EndAuctionTime.into());
-    }
-    Ok(())
-}
-
-// Asserts the vault is ready to settle on Zeta DEX.
-fn settlement_phase(vault: &Vault) -> ProgramResult {
-    let clock = Clock::get()?;
-    if clock.unix_timestamp <= vault.epoch_times.start_settlement {
-        return Err(ErrorCode::StartSettlementTime.into());
-    } else if clock.unix_timestamp > vault.epoch_times.end_epoch {
-        return Err(ErrorCode::EndEpochTime.into());
-    }
-    Ok(())
-}
-
-// Asserts the current vault epoch has ended.
-fn epoch_over(vault: &Vault) -> ProgramResult {
-    let clock = Clock::get()?;
-    if clock.unix_timestamp <= vault.epoch_times.end_epoch {
-        return Err(ErrorCode::EpochNotOver.into());
     }
     Ok(())
 }
