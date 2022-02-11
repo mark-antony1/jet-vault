@@ -11,7 +11,7 @@ import {
   types,
   constants,
 } from "@zetamarkets/sdk";
-import { mintUsdc, getClosestMarket } from "./utils";
+import { mintUsdc, getClosestMarket, jetMetadata } from "./utils";
 
 describe("vault", () => {
   const vaultAdmin = anchor.web3.Keypair.generate();
@@ -69,9 +69,9 @@ describe("vault", () => {
       ),
       "confirmed"
     );
-    console.log("Airdrop completed");
+    console.log("SOL Airdrop to vault admin completed");
 
-    const transferTransaction = new anchor.web3.Transaction().add(
+    const solTransferTransaction = new anchor.web3.Transaction().add(
       anchor.web3.SystemProgram.transfer({
         fromPubkey: vaultAdmin.publicKey,
         lamports: 0.1 * anchor.web3.LAMPORTS_PER_SOL, // 0.1 SOL
@@ -80,14 +80,13 @@ describe("vault", () => {
     );
     await anchor.web3.sendAndConfirmTransaction(
       provider.connection,
-      transferTransaction,
+      solTransferTransaction,
       [vaultAdmin]
     );
 
-    usdcMint = await zetaUtils.getTokenMint(
-      provider.connection,
-      Exchange.vaultAddress
-    );
+    console.log("getting token mint", jetMetadata.reserves[0].accounts.tokenMint)
+    usdcMint = new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.tokenMint)
+    console.log(`usdmint ${usdcMint}`)
     usdcMintAccount = new Token(
       provider.connection,
       usdcMint,
@@ -123,6 +122,7 @@ describe("vault", () => {
       [Buffer.from(vaultName)],
       program.programId
     );
+    // console.log("vault vault", vault)
 
     [redeemableMint, redeemableMintBump] =
       await anchor.web3.PublicKey.findProgramAddress(
@@ -130,15 +130,19 @@ describe("vault", () => {
         program.programId
       );
 
+    // console.log("redeemable", redeemableMint)
+
     [vaultUsdc, vaultUsdcBump] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("vault-usdc"), Buffer.from(vaultName)],
       program.programId
     );
+    // console.log('vault vaultUsdc vaultUsdc')
+
 
     [vaultAuthority, vaultAuthorityBump] =
       await anchor.web3.PublicKey.findProgramAddress(
         [Buffer.from("vault-authority"), Buffer.from(vaultName)],
-        program.programId
+        new anchor.web3.PublicKey(`Fx1bCAyYpLMPVAjfq1pxbqKKkvDR3iYEpam1KbThRDYQ`)
       );
 
     let vaultLamports = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.1);
@@ -161,6 +165,7 @@ describe("vault", () => {
       epochCadence: new anchor.BN(40), // seconds
     };
 
+    console.log("about to init vault")
     await program.rpc.initializeVault(
       vaultName,
       vaultLamports,
@@ -181,6 +186,7 @@ describe("vault", () => {
         signers: [vaultAdmin],
       }
     );
+    console.log("init vault")
 
     redeemableMintAccount = new Token(
       provider.connection,
