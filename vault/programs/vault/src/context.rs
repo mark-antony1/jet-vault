@@ -23,6 +23,12 @@ pub struct InitializeVault<'info> {
         bump = bumps.vault_authority
     )]
     pub vault_authority: AccountInfo<'info>,
+    // Trying to add a new program that can be called on to mint jet USDC arbitrarily
+    #[account(
+        seeds = [MINT_AUTHORITY_SEED.as_bytes()],
+        bump = bumps.mint_authority
+    )]
+    pub mint_authority: AccountInfo<'info>,
     #[account(address = address::usdc::ID)]
     pub usdc_mint: Box<Account<'info, Mint>>,
     #[account(
@@ -312,6 +318,7 @@ pub struct VaultBumps {
     pub vault_authority: u8,
     pub redeemable_mint: u8,
     pub vault_usdc: u8,
+    pub mint_authority: u8,
 }
 
 // CPI context traits

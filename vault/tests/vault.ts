@@ -105,6 +105,8 @@ describe("vault", () => {
     vaultBump,
     vaultAuthority,
     vaultAuthorityBump,
+    mintAuthority,
+    mintAuthorityBump,
     redeemableMint,
     redeemableMintAccount,
     redeemableMintBump,
@@ -122,7 +124,6 @@ describe("vault", () => {
       [Buffer.from(vaultName)],
       program.programId
     );
-    // console.log("vault vault", vault)
 
     [redeemableMint, redeemableMintBump] =
       await anchor.web3.PublicKey.findProgramAddress(
@@ -130,19 +131,23 @@ describe("vault", () => {
         program.programId
       );
 
-    // console.log("redeemable", redeemableMint)
 
     [vaultUsdc, vaultUsdcBump] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("vault-usdc"), Buffer.from(vaultName)],
       program.programId
     );
-    // console.log('vault vaultUsdc vaultUsdc')
 
+    // Doubt I'm supplying the right bump here
+    [mintAuthority, mintAuthorityBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from("mint-authority"), Buffer.from(vaultName)],
+        new anchor.web3.PublicKey(`Fx1bCAyYpLMPVAjfq1pxbqKKkvDR3iYEpam1KbThRDYQ`)
+      );
 
     [vaultAuthority, vaultAuthorityBump] =
       await anchor.web3.PublicKey.findProgramAddress(
-        [Buffer.from("vault-authority"), Buffer.from(vaultName)],
-        new anchor.web3.PublicKey(`Fx1bCAyYpLMPVAjfq1pxbqKKkvDR3iYEpam1KbThRDYQ`)
+        [Buffer.from("vault-authority")],
+        program.programId
       );
 
     let vaultLamports = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.1);
@@ -150,6 +155,7 @@ describe("vault", () => {
     bumps = {
       vault: vaultBump,
       vaultAuthority: vaultAuthorityBump,
+      mintAuthority: mintAuthorityBump,
       redeemableMint: redeemableMintBump,
       vaultUsdc: vaultUsdcBump,
     };
@@ -175,6 +181,7 @@ describe("vault", () => {
         accounts: {
           vaultAdmin: vaultAdmin.publicKey,
           vault,
+          mintAuthority,
           vaultAuthority,
           usdcMint,
           redeemableMint,

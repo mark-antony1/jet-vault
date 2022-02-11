@@ -13,6 +13,7 @@ export interface IVaultBumps {
   vaultAuthority: number;
   redeemableMint: number;
   vaultUsdc: number;
+  mintAuthority: number;
 }
 
 export interface IEpochTimes {
