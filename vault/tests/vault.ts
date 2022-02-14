@@ -50,7 +50,7 @@ describe("vault", () => {
   let usdcMint: anchor.web3.PublicKey;
   let vaultMargin;
 
-  it("Initializes the state of the world", async () => {
+  it("Initializes the state of the world for jet USDC", async () => {
     // Load Zeta SDK exchange object which has all the info one might need
     await Exchange.load(
       zetaProgram,
@@ -110,6 +110,10 @@ describe("vault", () => {
     redeemableMintBump,
     vaultUsdc,
     vaultUsdcBump,
+    market,
+    marketBump,
+    marketAuthority,
+    marketAuthorityBump,
     userRedeemable,
     userRedeemableBump,
     secondUserRedeemable,
@@ -140,6 +144,18 @@ describe("vault", () => {
         [Buffer.from("vault-authority"), Buffer.from(vaultName)],
         program.programId
       );
+    
+    [market, marketBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [],
+        new anchor.web3.PublicKey(jetMetadata.market.market)
+      );
+    
+    [marketAuthority, marketAuthorityBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [],
+        new anchor.web3.PublicKey(jetMetadata.market.marketAuthority)
+      );
 
     let vaultLamports = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.1);
 
@@ -148,6 +164,8 @@ describe("vault", () => {
       vaultAuthority: vaultAuthorityBump,
       redeemableMint: redeemableMintBump,
       vaultUsdc: vaultUsdcBump,
+      usdMarket: marketBump,
+      usdMarketAuthority: marketAuthorityBump,
     };
 
     const nowBn = new anchor.BN(Date.now() / 1000);
@@ -161,7 +179,7 @@ describe("vault", () => {
       epochCadence: new anchor.BN(40), // seconds
     };
 
-    console.log("about to init vault")
+    console.log(`about to init vault w/ ${usdcMint} as usdc mint`)
     await program.rpc.initializeVault(
       vaultName,
       vaultLamports,
@@ -173,8 +191,11 @@ describe("vault", () => {
           vault,
           vaultAuthority,
           usdcMint,
+          market,
+          marketAuthority,
           redeemableMint,
           vaultUsdc,
+          obligationProgram: vault,
           systemProgram: anchor.web3.SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,

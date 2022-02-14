@@ -1,5 +1,5 @@
 use crate::constants::*;
-use crate::zeta_context::*;
+//use crate::zeta_context::*;
 use crate::*;
 
 #[derive(Accounts)]
@@ -12,7 +12,7 @@ pub struct InitializeVault<'info> {
     #[account(
         init,
         seeds = [vault_name.as_bytes()],
-        bump = bumps.vault,
+        bump,
         payer = vault_admin
     )]
     pub vault: Box<Account<'info, Vault>>,
@@ -25,12 +25,16 @@ pub struct InitializeVault<'info> {
     pub vault_authority: AccountInfo<'info>,
     #[account()]
     pub usdc_mint: Box<Account<'info, Mint>>,
+    #[account()]
+    pub market: AccountInfo<'info>,
+    #[account()]
+    pub market_authority: AccountInfo<'info>,
     #[account(
         init,
-        mint::decimals = PLATFORM_PRECISION as u8,
+        mint::decimals = 8 as u8,
         mint::authority = vault_authority,
         seeds = [REDEEMABLE_MINT_SEED.as_bytes(), vault_name.as_bytes()],
-        bump = bumps.redeemable_mint,
+        bump,
         payer = vault_admin
     )]
     pub redeemable_mint: Box<Account<'info, Mint>>,
@@ -39,13 +43,14 @@ pub struct InitializeVault<'info> {
         token::mint = usdc_mint,
         token::authority = vault_authority,
         seeds = [VAULT_USDC_SEED.as_bytes(), vault_name.as_bytes()],
-        bump = bumps.vault_usdc,
+        bump,
         payer = vault_admin
     )]
     pub vault_usdc: Box<Account<'info, TokenAccount>>,
     // Programs and Sysvars
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
+    pub obligation_program: UncheckedAccount<'info>,
     pub rent: Sysvar<'info, Rent>,
 }
 
@@ -176,96 +181,6 @@ pub struct WithdrawVault<'info> {
     pub vault_usdc: Box<Account<'info, TokenAccount>>,
     // Programs and Sysvars
     pub token_program: Program<'info, Token>,
-}
-
-#[derive(Accounts)]
-pub struct InitializeZetaMarginAccount<'info> {
-    pub zeta_program: AccountInfo<'info>,
-    pub vault_admin: Signer<'info>,
-    #[account(
-        seeds = [vault.vault_name.as_ref().strip()],
-        bump = vault.bumps.vault,
-        constraint = vault.vault_admin == vault_admin.key() @ ErrorCode::InvalidVaultAdmin,
-        constraint = vault.usdc_mint == usdc_mint.key() @ ErrorCode::InvalidUsdcMint
-    )]
-    pub vault: Box<Account<'info, Vault>>,
-    pub usdc_mint: Box<Account<'info, Mint>>,
-    pub initialize_margin_cpi_accounts: InitializeMarginAccount<'info>,
-}
-
-#[derive(Accounts)]
-pub struct DepositZeta<'info> {
-    pub zeta_program: AccountInfo<'info>,
-    pub vault_admin: Signer<'info>,
-    #[account(
-        seeds = [vault.vault_name.as_ref().strip()],
-        bump = vault.bumps.vault,
-        constraint = vault.vault_admin == vault_admin.key() @ ErrorCode::InvalidVaultAdmin,
-        constraint = vault.usdc_mint == usdc_mint.key() @ ErrorCode::InvalidUsdcMint
-    )]
-    pub vault: Box<Account<'info, Vault>>,
-    pub usdc_mint: Box<Account<'info, Mint>>,
-    pub deposit_cpi_accounts: Deposit<'info>,
-}
-
-#[derive(Accounts)]
-pub struct WithdrawZeta<'info> {
-    pub zeta_program: AccountInfo<'info>,
-    pub vault_admin: Signer<'info>,
-    #[account(
-        seeds = [vault.vault_name.as_ref().strip()],
-        bump = vault.bumps.vault,
-        constraint = vault.vault_admin == vault_admin.key() @ ErrorCode::InvalidVaultAdmin,
-        constraint = vault.usdc_mint == usdc_mint.key() @ ErrorCode::InvalidUsdcMint
-    )]
-    pub vault: Box<Account<'info, Vault>>,
-    pub usdc_mint: Box<Account<'info, Mint>>,
-    pub withdraw_cpi_accounts: Withdraw<'info>,
-}
-
-#[derive(Accounts)]
-pub struct InitializeZetaOpenOrders<'info> {
-    pub zeta_program: AccountInfo<'info>,
-    pub vault_admin: Signer<'info>,
-    #[account(
-        seeds = [vault.vault_name.as_ref().strip()],
-        bump = vault.bumps.vault,
-        constraint = vault.vault_admin == vault_admin.key() @ ErrorCode::InvalidVaultAdmin,
-        constraint = vault.usdc_mint == usdc_mint.key() @ ErrorCode::InvalidUsdcMint
-    )]
-    pub vault: Box<Account<'info, Vault>>,
-    pub usdc_mint: Box<Account<'info, Mint>>,
-    pub initialize_open_orders_cpi_accounts: InitializeOpenOrders<'info>,
-}
-
-#[derive(Accounts)]
-pub struct PlaceAuctionOrder<'info> {
-    pub zeta_program: AccountInfo<'info>,
-    pub vault_admin: Signer<'info>,
-    #[account(
-        seeds = [vault.vault_name.as_ref().strip()],
-        bump = vault.bumps.vault,
-        constraint = vault.vault_admin == vault_admin.key() @ ErrorCode::InvalidVaultAdmin,
-        constraint = vault.usdc_mint == usdc_mint.key() @ ErrorCode::InvalidUsdcMint
-    )]
-    pub vault: Box<Account<'info, Vault>>,
-    pub usdc_mint: Box<Account<'info, Mint>>,
-    pub place_order_cpi_accounts: PlaceOrder<'info>,
-}
-
-#[derive(Accounts)]
-pub struct CancelAuctionOrder<'info> {
-    pub zeta_program: AccountInfo<'info>,
-    pub vault_admin: Signer<'info>,
-    #[account(
-        seeds = [vault.vault_name.as_ref().strip()],
-        bump = vault.bumps.vault,
-        constraint = vault.vault_admin == vault_admin.key() @ ErrorCode::InvalidVaultAdmin,
-        constraint = vault.usdc_mint == usdc_mint.key() @ ErrorCode::InvalidUsdcMint
-    )]
-    pub vault: Box<Account<'info, Vault>>,
-    pub usdc_mint: Box<Account<'info, Mint>>,
-    pub cancel_order_cpi_accounts: CancelOrder<'info>,
 }
 
 #[derive(Accounts)]

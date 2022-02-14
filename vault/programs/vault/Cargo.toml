@@ -15,8 +15,10 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.18.2"
-anchor-spl = "0.18.2"
+anchor-lang = "0.21.0"
+anchor-spl = "0.21.0"
 bytemuck = "1.4.0"
-rust_decimal = { git = "https://github.com/zetamarkets/rust-decimal.git", features = ["maths"] }
-cpi-interface = { path = "../../../cpi-interface", version = "0.1.0" }
+#rust_decimal = { git = "https://github.com/zetamarkets/rust-decimal.git", features = ["maths"] }
+#jet = { git = "https://github.com/jet-lab/jet-v1" }
+jet-proto-v1-cpi = { git = "https://github.com/jet-lab/jet-v1", branch = "cpi-library" }
+uint = "=0.9.1"

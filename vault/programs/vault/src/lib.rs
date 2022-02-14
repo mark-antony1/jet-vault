@@ -1,22 +1,17 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke, system_instruction};
 use anchor_spl::token::{self, Burn, CloseAccount, Mint, MintTo, Token, TokenAccount, Transfer};
-use rust_decimal::prelude::*;
+// use rust_decimal::prelude::*;
 use std::ops::Deref;
+// use jet::cpi::accounts::{InitializeObligation};
+use jet_proto_v1_cpi::init_obligation;
+use jet_proto_v1_cpi::accounts::*;
+use crate::context::*;
 
 pub mod address;
 pub mod constants;
 pub mod context;
 pub mod pyth_client;
-pub mod zeta_account;
-pub mod zeta_client;
-pub mod zeta_constants;
-pub mod zeta_context;
-pub mod zeta_utils;
-use crate::context::*;
-use crate::zeta_account::*;
-use crate::zeta_constants::*;
-use crate::zeta_utils::*;
 use constants::*;
 
 declare_id!("Cw4xY7rsYrsY15WxHi8wy7ZD2G7cp3TKxGZiwD28zMAe");
@@ -36,39 +31,52 @@ pub mod vault {
     ) -> ProgramResult {
         msg!("Initialize vault");
 
-        let vault = &mut ctx.accounts.vault;
+        // let vault = &mut ctx.accounts.vault;
 
-        let name_bytes = vault_name.as_bytes();
-        let mut name_data = [b' '; 20];
-        name_data[..name_bytes.len()].copy_from_slice(name_bytes);
+        // let name_bytes = vault_name.as_bytes();
+        // let mut name_data = [b' '; 20];
+        // name_data[..name_bytes.len()].copy_from_slice(name_bytes);
 
-        vault.vault_name = name_data;
-        vault.bumps = bumps;
-        vault.vault_admin = ctx.accounts.vault_admin.key();
+        // vault.vault_name = name_data;
+        // vault.bumps = bumps;
+        // vault.vault_admin = ctx.accounts.vault_admin.key();
 
-        vault.usdc_mint = ctx.accounts.usdc_mint.key();
-        vault.redeemable_mint = ctx.accounts.redeemable_mint.key();
-        vault.vault_usdc = ctx.accounts.vault_usdc.key();
+        // vault.usdc_mint = ctx.accounts.usdc_mint.key();
+        // vault.redeemable_mint = ctx.accounts.redeemable_mint.key();
+        // vault.vault_usdc = ctx.accounts.vault_usdc.key();
 
-        vault.epoch_times = epoch_times;
+        // vault.epoch_times = epoch_times;
 
-        // Transfer initial lamport balance to vault payer
-        msg!(
-            "Transferring {} lamports from `vault_admin` to `vault_authority`",
-            vault_lamports
-        );
-        invoke(
-            &system_instruction::transfer(
-                &ctx.accounts.vault_admin.key(),
-                &ctx.accounts.vault_authority.key(),
-                vault_lamports,
-            ),
-            &[
-                ctx.accounts.vault_admin.to_account_info(),
-                ctx.accounts.vault_authority.to_account_info(),
-                ctx.accounts.system_program.to_account_info(),
-            ],
-        )?;
+        // // Transfer initial lamport balance to vault payer
+        // msg!(
+        //     "Transferring {} lamports from `vault_admin` to `vault_authority`",
+        //     vault_lamports
+        // );
+        // invoke(
+        //     &system_instruction::transfer(
+        //         &ctx.accounts.vault_admin.key(),
+        //         &ctx.accounts.vault_authority.key(),
+        //         vault_lamports,
+        //     ),
+        //     &[
+        //         ctx.accounts.vault_admin.to_account_info(),
+        //         ctx.accounts.vault_authority.to_account_info(),
+        //         ctx.accounts.system_program.to_account_info(),
+        //     ],
+        // )?;
+
+        // let cpi_program = ctx.accounts.obligation_program.to_account_info();
+        // let cpi_accounts = InitializeObligation{
+        //     market: ctx.accounts.market.to_account_info(),
+        //     market_authority: ctx.accounts.market_authority.to_account_info(),
+        //     token_program: ctx.accounts.usdc_mint.to_account_info(),
+        //     borrower: ctx.accounts.vault.to_account_info(),
+        //     system_program: ctx.accounts.system_program.to_account_info(),
+        //     obligation: ctx.accounts.vault.to_account_info(),
+        // };
+
+        // let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        // init_obligation(cpi_ctx, 0)
 
         Ok(())
     }
