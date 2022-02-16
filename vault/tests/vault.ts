@@ -9,7 +9,7 @@ import {
   utils as zetaUtils,
   constants,
 } from "@zetamarkets/sdk";
-import { mintUsdc, getClosestMarket, jetMetadata } from "./utils";
+import { buildFaucetAirdropIx, jetMetadata } from "./utils";
 
 describe("vault", () => {
   const vaultAdmin = anchor.web3.Keypair.generate();
@@ -143,8 +143,7 @@ describe("vault", () => {
     market = new anchor.web3.PublicKey(jetMetadata.market.market),
 
     reserve = new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.reserve),
-    
-    
+
     [obligationPda, obligationPdaBump] =
       await anchor.web3.PublicKey.findProgramAddress(
         [Buffer.from('obligation'), market.toBuffer(), vaultAuthority.toBuffer()],
@@ -247,88 +246,99 @@ describe("vault", () => {
     assert.equal(redeemableMintInfo.supply.toNumber(), 0);
   });
 
-  let userUsdc;
-  const firstDeposit = 40;
+  let userUsdc: anchor.web3.PublicKey;
+  const firstDeposit = 4000;
 
-  // it("Exchanges user USDC for redeemable tokens", async () => {
-  //   // Wait until the vault has opened.
-  //   if (Date.now() < epochTimes.startEpoch.toNumber() * 1000) {
-  //     await sleep(epochTimes.startEpoch.toNumber() * 1000 - Date.now() + 2000);
-  //   }
+  it("Exchanges user USDC for redeemable tokens", async () => {
+    // Wait until the vault has opened.
+    if (Date.now() < epochTimes.startEpoch.toNumber() * 1000) {
+      await sleep(epochTimes.startEpoch.toNumber() * 1000 - Date.now() + 2000);
+    }
 
-  //   userUsdc = await usdcMintAccount.createAssociatedTokenAccount(
-  //     userKeypair.publicKey
-  //   );
+    userUsdc = await usdcMintAccount.createAssociatedTokenAccount(
+      userKeypair.publicKey
+    );
 
-  //   // Mint USDC to user USDC wallet
-  //   console.log("Minting USDC to User 1");
-  //   await mintUsdc(userKeypair.publicKey, firstDeposit);
+    const instructions = [];  
+    const mintFakeUsdcIx = await buildFaucetAirdropIx(
+      new anchor.BN(firstDeposit),
+      new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.tokenMint),
+      userUsdc,
+      new anchor.web3.PublicKey('9BADYvZDaFBsGbeQEGeTQ9jBopLtd9fTKrycdjBXm7mZ')
+    )
 
-  //   // Check if we inited correctly
-  //   let userUsdcAccount = await usdcMintAccount.getAccountInfo(userUsdc);
+    instructions.push(mintFakeUsdcIx);
 
-  //   assert.equal(
-  //     zetaUtils.convertNativeBNToDecimal(userUsdcAccount.amount),
-  //     firstDeposit
-  //   );
+    const transaction = new anchor.web3.Transaction().add(...instructions);
 
-  //   [userRedeemable, userRedeemableBump] =
-  //     await anchor.web3.PublicKey.findProgramAddress(
-  //       [
-  //         Buffer.from("user-redeemable"),
-  //         Buffer.from(vaultName),
-  //         userKeypair.publicKey.toBuffer(),
-  //       ],
-  //       program.programId
-  //     );
+    transaction.feePayer = userKeypair.publicKey;
+    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+    await provider.send(transaction);
 
-  //   await program.rpc.depositVault(
-  //     userRedeemableBump,
-  //     new anchor.BN(zetaUtils.convertDecimalToNativeInteger(firstDeposit)),
-  //     {
-  //       accounts: {
-  //         userAuthority: userKeypair.publicKey,
-  //         userUsdc,
-  //         userRedeemable,
-  //         vault,
-  //         vaultAuthority,
-  //         usdcMint,
-  //         redeemableMint,
-  //         vaultUsdc,
-  //         tokenProgram: TOKEN_PROGRAM_ID,
-  //       },
-  //       instructions: [
-  //         program.instruction.initializeUserRedeemableTokenAccount({
-  //           accounts: {
-  //             userAuthority: userKeypair.publicKey,
-  //             userRedeemable,
-  //             vault,
-  //             vaultAuthority,
-  //             redeemableMint,
-  //             systemProgram: anchor.web3.SystemProgram.programId,
-  //             tokenProgram: TOKEN_PROGRAM_ID,
-  //             rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-  //           },
-  //         }),
-  //       ],
-  //       signers: [userKeypair],
-  //     }
-  //   );
+    let userUsdcAccount = await usdcMintAccount.getAccountInfo(userUsdc);
 
-  //   // Check that USDC is in vault and user has received their redeem tokens in return
-  //   let vaultUsdcAccount = await usdcMintAccount.getAccountInfo(vaultUsdc);
-  //   assert.equal(
-  //     zetaUtils.convertNativeBNToDecimal(vaultUsdcAccount.amount),
-  //     firstDeposit
-  //   );
-  //   let userRedeemableAccount = await redeemableMintAccount.getAccountInfo(
-  //     userRedeemable
-  //   );
-  //   assert.equal(
-  //     zetaUtils.convertNativeBNToDecimal(userRedeemableAccount.amount),
-  //     firstDeposit
-  //   );
-  // });
+    assert.equal(
+      userUsdcAccount.amount,
+      new anchor.BN(firstDeposit).toNumber()
+    );
+
+    [userRedeemable, userRedeemableBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [
+          Buffer.from("user-redeemable"),
+          Buffer.from(vaultName),
+          userKeypair.publicKey.toBuffer(),
+        ],
+        program.programId
+      );
+
+    await program.rpc.depositVault(
+      userRedeemableBump,
+      new anchor.BN(firstDeposit),
+      {
+        accounts: {
+          userAuthority: userKeypair.publicKey,
+          userUsdc,
+          userRedeemable,
+          vault,
+          vaultAuthority,
+          usdcMint,
+          redeemableMint,
+          vaultUsdc,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+        instructions: [
+          program.instruction.initializeUserRedeemableTokenAccount({
+            accounts: {
+              userAuthority: userKeypair.publicKey,
+              userRedeemable,
+              vault,
+              vaultAuthority,
+              redeemableMint,
+              systemProgram: anchor.web3.SystemProgram.programId,
+              tokenProgram: TOKEN_PROGRAM_ID,
+              rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+            },
+          }),
+        ],
+        signers: [userKeypair],
+      }
+    );
+
+    // Check that USDC is in vault and user has received their redeem tokens in return
+    let vaultUsdcAccount = await usdcMintAccount.getAccountInfo(vaultUsdc);
+    assert.equal(
+      vaultUsdcAccount.amount,
+      firstDeposit
+    );
+    let userRedeemableAccount = await redeemableMintAccount.getAccountInfo(
+      userRedeemable
+    );
+    assert.equal(
+      userRedeemableAccount.amount,
+      firstDeposit
+    );
+  });
 
   // const secondDeposit = 420;
   // let totalVaultUsdc, secondUserKeypair, secondUserUsdc;

@@ -141,7 +141,7 @@ export function getClosestMarket(
   return market;
 }
 
-const buildFaucetAirdropIx = async (
+export const buildFaucetAirdropIx = async (
   amount: anchor.BN,
   tokenMintPublicKey: anchor.web3.PublicKey,
   destinationAccountPubkey: anchor.web3.PublicKey,
