@@ -99,12 +99,19 @@ describe("vault", () => {
     vaultUsdc,
     vaultUsdcBump,
     market,
+    reserve,
     obligationPda,
     obligationPdaBump,
     userRedeemable,
     userRedeemableBump,
     secondUserRedeemable,
     secondUserRedeemableBump,
+    depositAccountPda,
+    depositAccountPdaBump,
+    collateralAccountPda,
+    collateralAccountPdaBump,
+    loanAccountPda,
+    loanAccountPdaBump,
     bumps: IVaultBumps,
     epochTimes: IEpochTimes;
 
@@ -134,10 +141,31 @@ describe("vault", () => {
       );
     
     market = new anchor.web3.PublicKey(jetMetadata.market.market),
+
+    reserve = new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.reserve),
+    
     
     [obligationPda, obligationPdaBump] =
       await anchor.web3.PublicKey.findProgramAddress(
         [Buffer.from('obligation'), market.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    [depositAccountPda, depositAccountPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('deposits'), reserve.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    [collateralAccountPda, collateralAccountPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('collateral'), reserve.toBuffer(), obligationPda.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+    
+    [loanAccountPda, loanAccountPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('loan'), reserve.toBuffer(), obligationPda.toBuffer(), vaultAuthority.toBuffer()],
         new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
       );
 
@@ -149,6 +177,8 @@ describe("vault", () => {
       redeemableMint: redeemableMintBump,
       vaultUsdc: vaultUsdcBump,
       obligation: obligationPdaBump,
+      depositAccount: depositAccountPdaBump,
+      collateralAccount: collateralAccountPdaBump,
     };
 
     const nowBn = new anchor.BN(Date.now() / 1000);
@@ -175,11 +205,17 @@ describe("vault", () => {
           vault,
           vaultAuthority,
           usdcMint,
+          depositNoteMint:  new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.depositNoteMint),
           market: new anchor.web3.PublicKey(jetMetadata.market.market),
+          loanNoteMint: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.loanNoteMint),
           obligation: obligationPda,
           marketAuthority: new anchor.web3.PublicKey(jetMetadata.market.marketAuthority),
           redeemableMint,
           vaultUsdc,
+          depositAccount: depositAccountPda,
+          collateralAccount: collateralAccountPda,
+          loanAccount: loanAccountPda,
+          reserve: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.reserve),
           jetProgram: new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")          ,
           systemProgram: anchor.web3.SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,

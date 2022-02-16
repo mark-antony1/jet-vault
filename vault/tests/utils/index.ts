@@ -14,6 +14,8 @@ export interface IVaultBumps {
   redeemableMint: number;
   vaultUsdc: number;
   obligation: number;
+  depositAccount: number;
+  collateralAccount: number;
 }
 
 export interface IEpochTimes {

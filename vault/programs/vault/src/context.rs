@@ -23,12 +23,24 @@ pub struct InitializeVault<'info> {
         bump = bumps.vault_authority
     )]
     pub vault_authority: UncheckedAccount<'info>,
-    #[account(mut)]
+    #[account()]
     pub usdc_mint: Box<Account<'info, Mint>>,
-    #[account(mut)]
+    #[account()]
     pub market: UncheckedAccount<'info>,
     #[account(mut)]
     pub obligation: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub deposit_account: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub collateral_account: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub loan_account: UncheckedAccount<'info>,
+    #[account()]
+    pub deposit_note_mint: UncheckedAccount<'info>,
+    #[account()]
+    pub loan_note_mint: UncheckedAccount<'info>,
+    #[account()]
+    pub reserve: UncheckedAccount<'info>,
     #[account(mut)]
     pub market_authority: UncheckedAccount<'info>,
     #[account(
@@ -231,6 +243,9 @@ pub struct VaultBumps {
     pub vault_usdc: u8,
     pub mint_authority: u8,
     pub obligation: u8,
+    pub deposit_account: u8,
+    pub collateral_account: u8,
+    pub loan_account: u8,
 }
 
 // CPI context traits

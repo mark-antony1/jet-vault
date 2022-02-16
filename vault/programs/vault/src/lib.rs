@@ -4,7 +4,7 @@ use anchor_spl::token::{self, Burn, CloseAccount, Mint, MintTo, Token, TokenAcco
 // use rust_decimal::prelude::*;
 use std::ops::Deref;
 // use jet::cpi::accounts::{InitializeObligation};
-use jet_proto_v1_cpi::{init_obligation, init_deposit_account};
+use jet_proto_v1_cpi::{init_obligation, init_deposit_account, init_collateral_account};
 use jet_proto_v1_cpi::accounts::*;
 use crate::context::*;
 
@@ -21,6 +21,8 @@ pub mod vault {
 
     use std::borrow::Borrow;
 
+    use jet_proto_v1_cpi::init_collateral_account;
+
     use super::*;
 
     #[access_control(validate_epoch_times(epoch_times))]
@@ -31,29 +33,30 @@ pub mod vault {
         bumps: VaultBumps,
         epoch_times: EpochTimes,
     ) -> ProgramResult {
-        msg!("Initialize vault");
+        // msg!("Initialize vault");
 
         let vault = &mut ctx.accounts.vault;
 
-        let name_bytes = vault_name.as_bytes();
-        let mut name_data = [b' '; 20];
-        name_data[..name_bytes.len()].copy_from_slice(name_bytes);
+        {
+            let name_bytes = vault_name.as_bytes();
+            let mut name_data = [b' '; 20];
+            name_data[..name_bytes.len()].copy_from_slice(name_bytes);
 
-        vault.vault_name = name_data;
-        vault.bumps = bumps;
-        vault.vault_admin = ctx.accounts.vault_admin.key();
+            vault.vault_name = name_data;
+            vault.bumps = bumps;
+            vault.vault_admin = ctx.accounts.vault_admin.key();
 
-        vault.usdc_mint = ctx.accounts.usdc_mint.key();
-        vault.redeemable_mint = ctx.accounts.redeemable_mint.key();
-        vault.vault_usdc = ctx.accounts.vault_usdc.key();
+            vault.usdc_mint = ctx.accounts.usdc_mint.key();
+            vault.redeemable_mint = ctx.accounts.redeemable_mint.key();
+            vault.vault_usdc = ctx.accounts.vault_usdc.key();
 
-        vault.epoch_times = epoch_times;
-
+            vault.epoch_times = epoch_times;
+        }
         // Transfer initial lamport balance to vault payer
-        msg!(
-            "Transferring {} lamports from `vault_admin` to `vault_authority`",
-            vault_lamports
-        );
+        // msg!(
+        //     "Transferring {} lamports from `vault_admin` to `vault_authority`",
+        //     vault_lamports
+        // );
         invoke(
             &system_instruction::transfer(
                 &ctx.accounts.vault_admin.key(),
@@ -67,24 +70,74 @@ pub mod vault {
             ],
         )?;
 
-        msg!(&ctx.accounts.market.key().to_string());
-        let cpi_program = ctx.accounts.jet_program.to_account_info();
-        let cpi_accounts = InitializeObligation{
+        {
+            msg!(&ctx.accounts.market.key().to_string());
+            let cpi_program = ctx.accounts.jet_program.to_account_info();
+            let cpi_accounts = InitializeObligation{
+                market: ctx.accounts.market.to_account_info(),
+                market_authority: ctx.accounts.market_authority.to_account_info(),
+                token_program: ctx.accounts.token_program.to_account_info(),
+                borrower: ctx.accounts.vault_authority.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                obligation: ctx.accounts.obligation.to_account_info(),
+            };
+
+            let my_vault_authority_bump = vault.bumps.vault_authority;
+            let seeds = &[VAULT_AUTHORITY_SEED.as_bytes(), vault_name.as_bytes(), &[my_vault_authority_bump]];
+            let signers = [&seeds[..]];
+
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,&signers);
+            // msg!("vault authority key {}", ctx.accounts.vault_authority.key());
+            init_obligation(cpi_ctx, vault.bumps.obligation)?;
+            // msg!("res:  {:?}", res);
+        } 
+
+        {
+            let cpi_accounts = InitializeDepositAccount{
+                market: ctx.accounts.market.to_account_info(),
+                market_authority: ctx.accounts.market_authority.to_account_info(),
+                token_program: ctx.accounts.token_program.to_account_info(),
+                depositor: ctx.accounts.vault_authority.to_account_info(),
+                deposit_note_mint: ctx.accounts.deposit_note_mint.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                deposit_account: ctx.accounts.deposit_account.to_account_info(),
+                reserve: ctx.accounts.reserve.to_account_info(),
+                rent: ctx.accounts.rent.to_account_info(),
+            };
+
+            let cpi_program = ctx.accounts.jet_program.to_account_info();
+            let my_vault_authority_bump = vault.bumps.vault_authority;
+            let seeds = &[VAULT_AUTHORITY_SEED.as_bytes(), vault_name.as_bytes(), &[my_vault_authority_bump]];
+            let signers = [&seeds[..]];
+
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,&signers);
+            // msg!("about to init deposit account w/ {:?} as market and {:?} as reserve", ctx.accounts.market.key(), ctx.accounts.reserve.key());
+            init_deposit_account(cpi_ctx, vault.bumps.deposit_account)?;
+            // msg!("res:  {:?}", res);
+        }
+        
+
+        let cpi_accounts = InitializeCollateralAccount{
             market: ctx.accounts.market.to_account_info(),
             market_authority: ctx.accounts.market_authority.to_account_info(),
             token_program: ctx.accounts.token_program.to_account_info(),
-            borrower: ctx.accounts.vault_authority.to_account_info(),
+            owner: ctx.accounts.vault_authority.to_account_info(),
+            deposit_note_mint: ctx.accounts.deposit_note_mint.to_account_info(),
             system_program: ctx.accounts.system_program.to_account_info(),
             obligation: ctx.accounts.obligation.to_account_info(),
+            reserve: ctx.accounts.reserve.to_account_info(),
+            collateral_account: ctx.accounts.collateral_account.to_account_info(),
+            rent: ctx.accounts.rent.to_account_info(),
         };
 
+        let cpi_program = ctx.accounts.jet_program.to_account_info();
         let my_vault_authority_bump = vault.bumps.vault_authority;
         let seeds = &[VAULT_AUTHORITY_SEED.as_bytes(), vault_name.as_bytes(), &[my_vault_authority_bump]];
         let signers = [&seeds[..]];
 
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,&signers);
-        msg!("vault authority key {}", ctx.accounts.vault_authority.key());
-        init_obligation(cpi_ctx, vault.bumps.obligation)
+        msg!("about to init collateral account w/ {:?} as market and {:?} as reserve", ctx.accounts.market.key(), ctx.accounts.reserve.key());
+        init_collateral_account(cpi_ctx, vault.bumps.collateral_account)
     }
 
     #[access_control(deposit_withdraw_phase(&ctx.accounts.vault))]
