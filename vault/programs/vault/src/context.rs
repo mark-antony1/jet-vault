@@ -22,13 +22,15 @@ pub struct InitializeVault<'info> {
         seeds = [VAULT_AUTHORITY_SEED.as_bytes(), vault_name.as_bytes()],
         bump = bumps.vault_authority
     )]
-    pub vault_authority: AccountInfo<'info>,
-    #[account()]
+    pub vault_authority: UncheckedAccount<'info>,
+    #[account(mut)]
     pub usdc_mint: Box<Account<'info, Mint>>,
-    #[account()]
-    pub market: AccountInfo<'info>,
-    #[account()]
-    pub market_authority: AccountInfo<'info>,
+    #[account(mut)]
+    pub market: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub obligation: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub market_authority: UncheckedAccount<'info>,
     #[account(
         init,
         mint::decimals = 8 as u8,
@@ -50,7 +52,7 @@ pub struct InitializeVault<'info> {
     // Programs and Sysvars
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
-    pub obligation_program: UncheckedAccount<'info>,
+    pub jet_program: UncheckedAccount<'info>,
     pub rent: Sysvar<'info, Rent>,
 }
 
@@ -228,6 +230,7 @@ pub struct VaultBumps {
     pub redeemable_mint: u8,
     pub vault_usdc: u8,
     pub mint_authority: u8,
+    pub obligation: u8,
 }
 
 // CPI context traits
