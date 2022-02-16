@@ -179,6 +179,7 @@ describe("vault", () => {
       obligation: obligationPdaBump,
       depositAccount: depositAccountPdaBump,
       collateralAccount: collateralAccountPdaBump,
+      loanAccount: loanAccountPdaBump
     };
 
     const nowBn = new anchor.BN(Date.now() / 1000);

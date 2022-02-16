@@ -16,6 +16,7 @@ export interface IVaultBumps {
   obligation: number;
   depositAccount: number;
   collateralAccount: number;
+  loanAccount: number;
 }
 
 export interface IEpochTimes {
