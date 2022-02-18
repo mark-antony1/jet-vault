@@ -4,8 +4,9 @@ use anchor_spl::token::{self, Burn, CloseAccount, Mint, MintTo, Token, TokenAcco
 // use rust_decimal::prelude::*;
 use std::ops::Deref;
 // use jet::cpi::accounts::{InitializeObligation};
-use jet_proto_v1_cpi::{init_obligation, init_deposit_account, init_collateral_account, init_loan_account};
+use jet_proto_v1_cpi::{init_obligation, init_deposit_account, init_collateral_account, init_loan_account, deposit, refresh_reserve, borrow, deposit_collateral};
 use jet_proto_v1_cpi::accounts::*;
+use jet_proto_v1_cpi::{Amount, DepositCollateralBumpSeeds};
 use crate::context::*;
 
 pub mod address;
@@ -19,9 +20,7 @@ declare_id!("8KFe29BGwPevewGY147ytq2mSGuNVRtM4JaikvF6D26G");
 #[program]
 pub mod vault {
 
-    use std::borrow::Borrow;
-
-    use jet_proto_v1_cpi::init_collateral_account;
+    // use std::borrow::Borrow;
 
     use super::*;
 
@@ -162,12 +161,14 @@ pub mod vault {
     }
 
     #[access_control(deposit_withdraw_phase(&ctx.accounts.vault))]
-    pub fn deposit_vault(ctx: Context<DepositVault>, _bump: u8, usdc_amount: u64) -> ProgramResult {
+    pub fn deposit_vault(ctx: Context<DepositVault>, bumps: _DepositVaultBumps, usdc_amount: u64) -> ProgramResult {
         msg!("Deposit into vault");
         // While token::transfer will check this, we prefer a verbose err msg.
         if ctx.accounts.user_usdc.amount < usdc_amount {
             return Err(ErrorCode::InsufficientUsdcBalance.into());
         }
+
+        let vault = &ctx.accounts.vault;
 
         // Transfer user's USDC to vault USDC account.
         // Calculate USDC tokens due based on the redeem:usdc exchange rate P_z = ( N_u / N_z ).
@@ -195,7 +196,69 @@ pub mod vault {
         let signer = &[&seeds[..]];
         token::mint_to(ctx.accounts.into_mint_to_context(signer), usdc_amount)?;
 
-        Ok(())
+        let cpi_accounts = RefreshReserve{
+            deposit_note_mint: ctx.accounts.deposit_note_mint.to_account_info(),
+            market: ctx.accounts.market.to_account_info(),
+            market_authority: ctx.accounts.market_authority.to_account_info(),
+            token_program: ctx.accounts.token_program.to_account_info(),
+            reserve: ctx.accounts.reserve.to_account_info(),
+            fee_note_vault: ctx.accounts.fee_note_vault.to_account_info(),
+            pyth_oracle_price: ctx.accounts.pyth_price_oracle.to_account_info(),
+        };
+
+        let cpi_program = ctx.accounts.jet_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
+        refresh_reserve(cpi_ctx,)?;
+
+        let cpi_accounts = Deposit{
+            deposit_account: ctx.accounts.deposit_account.to_account_info(),
+            deposit_note_mint: ctx.accounts.deposit_note_mint.to_account_info(),
+            vault: ctx.accounts.jet_vault.to_account_info(),
+            market: ctx.accounts.market.to_account_info(),
+            market_authority: ctx.accounts.market_authority.to_account_info(),
+            token_program: ctx.accounts.token_program.to_account_info(),
+            depositor: ctx.accounts.vault_authority.to_account_info(),
+            deposit_source: ctx.accounts.vault_usdc.to_account_info(),
+            reserve: ctx.accounts.reserve.to_account_info(),
+        };
+
+        let cpi_program = ctx.accounts.jet_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
+        deposit(cpi_ctx, bumps.deposit_account, Amount::from_tokens(usdc_amount))?;
+
+        let cpi_accounts = DepositCollateral{
+            deposit_account: ctx.accounts.deposit_account.to_account_info(),
+            obligation: ctx.accounts.obligation.to_account_info(),
+            market: ctx.accounts.market.to_account_info(),
+            market_authority: ctx.accounts.market_authority.to_account_info(),
+            token_program: ctx.accounts.token_program.to_account_info(),
+            owner: ctx.accounts.vault_authority.to_account_info(),
+            collateral_account: ctx.accounts.collateral_account.to_account_info(),
+            reserve: ctx.accounts.reserve.to_account_info(),
+        };
+
+        let cpi_program = ctx.accounts.jet_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
+        msg!("about to deposit");
+        deposit_collateral(cpi_ctx, DepositCollateralBumpSeeds{collateral_account: bumps.collateral_account, deposit_account: bumps.deposit_account}, Amount::from_tokens(usdc_amount))
+
+        // let cpi_accounts = Borrow{
+        //     loan_account: ctx.accounts.loan_account.to_account_info(),
+        //     loan_note_mint: ctx.accounts.loan_note_mint.to_account_info(),
+        //     vault: ctx.accounts.jet_vault.to_account_info(),
+        //     receiver_account: ctx.accounts.vault_authority.to_account_info(),
+        //     obligation: ctx.accounts.obligation.to_account_info(),
+        //     market: ctx.accounts.market.to_account_info(),
+        //     market_authority: ctx.accounts.market_authority.to_account_info(),
+        //     token_program: ctx.accounts.token_program.to_account_info(),
+        //     borrower: ctx.accounts.vault_authority.to_account_info(),
+        //     reserve: ctx.accounts.reserve.to_account_info(),
+        // };
+
+        // msg!("about to borrow");
+        // let cpi_program = ctx.accounts.jet_program.to_account_info();
+        // let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
+        // borrow(cpi_ctx, bumps.loan_account, Amount::from_tokens(usdc_amount))
     }
 
     #[access_control(deposit_withdraw_phase(&ctx.accounts.vault))]

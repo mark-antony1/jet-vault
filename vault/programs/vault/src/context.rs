@@ -23,6 +23,25 @@ pub struct InitializeVault<'info> {
         bump = bumps.vault_authority
     )]
     pub vault_authority: UncheckedAccount<'info>,
+    #[account(
+        init,
+        mint::decimals = 8 as u8,
+        mint::authority = vault_authority,
+        seeds = [REDEEMABLE_MINT_SEED.as_bytes(), vault_name.as_bytes()],
+        bump,
+        payer = vault_admin
+    )]
+    pub redeemable_mint: Box<Account<'info, Mint>>,
+    #[account(
+        init,
+        token::mint = usdc_mint,
+        token::authority = vault_authority,
+        seeds = [VAULT_USDC_SEED.as_bytes(), vault_name.as_bytes()],
+        bump,
+        payer = vault_admin
+    )]
+    pub vault_usdc: Box<Account<'info, TokenAccount>>,
+    // Jet Accounts
     #[account()]
     pub usdc_mint: Box<Account<'info, Mint>>,
     #[account()]
@@ -43,24 +62,6 @@ pub struct InitializeVault<'info> {
     pub reserve: UncheckedAccount<'info>,
     #[account(mut)]
     pub market_authority: UncheckedAccount<'info>,
-    #[account(
-        init,
-        mint::decimals = 8 as u8,
-        mint::authority = vault_authority,
-        seeds = [REDEEMABLE_MINT_SEED.as_bytes(), vault_name.as_bytes()],
-        bump,
-        payer = vault_admin
-    )]
-    pub redeemable_mint: Box<Account<'info, Mint>>,
-    #[account(
-        init,
-        token::mint = usdc_mint,
-        token::authority = vault_authority,
-        seeds = [VAULT_USDC_SEED.as_bytes(), vault_name.as_bytes()],
-        bump,
-        payer = vault_admin
-    )]
-    pub vault_usdc: Box<Account<'info, TokenAccount>>,
     // Programs and Sysvars
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -101,7 +102,7 @@ pub struct InitUserRedeemableTokenAccount<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(bump: u8)]
+#[instruction(bumps: _DepositVaultBumps)]
 pub struct DepositVault<'info> {
     // User Accounts
     pub user_authority: Signer<'info>,
@@ -116,7 +117,7 @@ pub struct DepositVault<'info> {
         seeds = [USER_REDEEMABLE_SEED.as_bytes(),
             vault.vault_name.as_ref().strip(),
             user_authority.key().as_ref()],
-        bump = bump
+        bump = bumps.user_redeemable_account
     )]
     pub user_redeemable: Box<Account<'info, TokenAccount>>,
     // vault Accounts
@@ -131,6 +132,7 @@ pub struct DepositVault<'info> {
         bump = vault.bumps.vault_authority
     )]
     pub vault_authority: AccountInfo<'info>,
+    #[account(mut)]
     pub usdc_mint: Box<Account<'info, Mint>>,
     #[account(
         mut,
@@ -144,8 +146,34 @@ pub struct DepositVault<'info> {
         bump = vault.bumps.vault_usdc
     )]
     pub vault_usdc: Box<Account<'info, TokenAccount>>,
+    //Jet Accounts 
+    #[account(mut)]
+    pub market: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub fee_note_vault: UncheckedAccount<'info>,
+    #[account()]
+    pub pyth_price_oracle: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub reserve: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub market_authority: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub jet_vault: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub deposit_account: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub deposit_note_mint: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub collateral_account: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub loan_note_mint: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub loan_account: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub obligation: UncheckedAccount<'info>,
     // Programs and Sysvars
     pub token_program: Program<'info, Token>,
+    pub jet_program: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -246,6 +274,15 @@ pub struct VaultBumps {
     pub deposit_account: u8,
     pub collateral_account: u8,
     pub loan_account: u8,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Default, Clone)]
+pub struct _DepositVaultBumps {
+    pub loan_account: u8,
+    pub deposit_account: u8,
+    pub user_redeemable_account: u8,
+    pub collateral_account: u8,
+    pub obligation: u8,
 }
 
 // CPI context traits

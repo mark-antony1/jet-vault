@@ -19,6 +19,14 @@ export interface IVaultBumps {
   loanAccount: number;
 }
 
+export interface IDepositVaultBumps {
+  loanAccount: number;
+  depositAccount: number;
+  userRedeemableAccount: number;
+  obligation: number;
+  collateralAccount: number;
+}
+
 export interface IEpochTimes {
   startEpoch: anchor.BN;
   endDeposits: anchor.BN;

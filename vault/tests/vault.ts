@@ -3,7 +3,7 @@ import * as anchor from "@project-serum/anchor";
 import { Vault } from "../target/types/vault";
 import { TOKEN_PROGRAM_ID, Token } from "@solana/spl-token";
 import assert from "assert";
-import { sleep, IVaultBumps, IEpochTimes } from "./utils";
+import { sleep, IVaultBumps, IDepositVaultBumps, IEpochTimes } from "./utils";
 import {
   Network,
   utils as zetaUtils,
@@ -47,6 +47,32 @@ describe("vault", () => {
   let usdcMintAccount: Token;
   let usdcMint: anchor.web3.PublicKey;
 
+  let vault: anchor.web3.PublicKey,
+    vaultBump,
+    vaultAuthority,
+    vaultAuthorityBump,
+    redeemableMint,
+    redeemableMintAccount,
+    redeemableMintBump,
+    vaultUsdc,
+    vaultUsdcBump,
+    market,
+    reserve,
+    obligationPda,
+    obligationPdaBump,
+    userRedeemable,
+    userRedeemableBump,
+    secondUserRedeemable,
+    secondUserRedeemableBump,
+    depositAccountPda,
+    depositAccountPdaBump,
+    collateralAccountPda,
+    collateralAccountPdaBump,
+    loanAccountPda,
+    loanAccountPdaBump,
+    bumps: IVaultBumps,
+    epochTimes: IEpochTimes;
+
   it("Initializes the state of the world for jet USDC", async () => {
 
     // Airdrop some SOL to the vault authority
@@ -88,32 +114,6 @@ describe("vault", () => {
   // TODO: remove this - for purposes of creating unique testing vaults
   const vaultName = "test_vault_" + Math.random().toString(16).substring(2, 8); // "sol_put_sell";
   console.log(`Vault name: ${vaultName}`);
-
-  let vault: anchor.web3.PublicKey,
-    vaultBump,
-    vaultAuthority,
-    vaultAuthorityBump,
-    redeemableMint,
-    redeemableMintAccount,
-    redeemableMintBump,
-    vaultUsdc,
-    vaultUsdcBump,
-    market,
-    reserve,
-    obligationPda,
-    obligationPdaBump,
-    userRedeemable,
-    userRedeemableBump,
-    secondUserRedeemable,
-    secondUserRedeemableBump,
-    depositAccountPda,
-    depositAccountPdaBump,
-    collateralAccountPda,
-    collateralAccountPdaBump,
-    loanAccountPda,
-    loanAccountPdaBump,
-    bumps: IVaultBumps,
-    epochTimes: IEpochTimes;
 
   it("Initializes the vault", async () => {
     console.log("buffer ", Buffer.from(vaultName));
@@ -292,8 +292,40 @@ describe("vault", () => {
         program.programId
       );
 
+    [depositAccountPda, depositAccountPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('deposits'), reserve.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    [loanAccountPda, loanAccountPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('deposits'), reserve.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    [obligationPda, obligationPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('obligation'), market.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    [collateralAccountPda, collateralAccountPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('collateral'), reserve.toBuffer(), obligationPda.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    const depositVaultBumps: IDepositVaultBumps = {
+      loanAccount: loanAccountPdaBump,
+      depositAccount: depositAccountPdaBump,
+      userRedeemableAccount: userRedeemableBump,
+      collateralAccount: collateralAccountPdaBump,
+      obligation: obligationPdaBump
+    }
+
     await program.rpc.depositVault(
-      userRedeemableBump,
+      depositVaultBumps,
       new anchor.BN(firstDeposit),
       {
         accounts: {
@@ -305,7 +337,20 @@ describe("vault", () => {
           usdcMint,
           redeemableMint,
           vaultUsdc,
+          loanAccount: loanAccountPda,
+          collateralAccount: collateralAccountPda,
+          obligation: obligationPda,
+          loanNoteMint: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.loanNoteMint),
+          jetVault: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.vault),
+          market: new anchor.web3.PublicKey(jetMetadata.market.market),
+          depositNoteMint: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.depositNoteMint),
+          depositAccount: depositAccountPda,
+          feeNoteVault: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.feeNoteVault),
+          pythPriceOracle: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.pythPrice),
+          marketAuthority: new anchor.web3.PublicKey(jetMetadata.market.marketAuthority),
+          reserve: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.reserve),
           tokenProgram: TOKEN_PROGRAM_ID,
+          jetProgram: new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")          ,
         },
         instructions: [
           program.instruction.initializeUserRedeemableTokenAccount({
@@ -325,11 +370,13 @@ describe("vault", () => {
       }
     );
 
+    console.log("returns from deposit")
+
     // Check that USDC is in vault and user has received their redeem tokens in return
     let vaultUsdcAccount = await usdcMintAccount.getAccountInfo(vaultUsdc);
     assert.equal(
       vaultUsdcAccount.amount,
-      firstDeposit
+      0
     );
     let userRedeemableAccount = await redeemableMintAccount.getAccountInfo(
       userRedeemable
