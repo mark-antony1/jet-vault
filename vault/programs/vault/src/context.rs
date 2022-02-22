@@ -128,6 +128,7 @@ pub struct DepositVault<'info> {
     )]
     pub vault: Box<Account<'info, Vault>>,
     #[account(
+        mut,
         seeds = [VAULT_AUTHORITY_SEED.as_bytes(), vault.vault_name.as_ref().strip()],
         bump = vault.bumps.vault_authority
     )]
@@ -221,6 +222,10 @@ pub struct WithdrawVault<'info> {
         bump = vault.bumps.vault_usdc
     )]
     pub vault_usdc: Box<Account<'info, TokenAccount>>,
+    #[account()]
+    pub vault_usdc_collateral: Box<Account<'info, TokenAccount>>,
+    #[account()]
+    pub vault_usdc_liabilities: Box<Account<'info, TokenAccount>>,
     // Programs and Sysvars
     pub token_program: Program<'info, Token>,
 }

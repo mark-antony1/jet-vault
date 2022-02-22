@@ -298,15 +298,15 @@ describe("vault", () => {
         new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
       );
 
-    [loanAccountPda, loanAccountPdaBump] =
-      await anchor.web3.PublicKey.findProgramAddress(
-        [Buffer.from('deposits'), reserve.toBuffer(), vaultAuthority.toBuffer()],
-        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
-      );
-
     [obligationPda, obligationPdaBump] =
       await anchor.web3.PublicKey.findProgramAddress(
         [Buffer.from('obligation'), market.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    [loanAccountPda, loanAccountPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('loan'), reserve.toBuffer(), obligationPda.toBuffer(), vaultAuthority.toBuffer()],
         new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
       );
 
@@ -376,7 +376,7 @@ describe("vault", () => {
     let vaultUsdcAccount = await usdcMintAccount.getAccountInfo(vaultUsdc);
     assert.equal(
       vaultUsdcAccount.amount,
-      0
+      firstDeposit/2
     );
     let userRedeemableAccount = await redeemableMintAccount.getAccountInfo(
       userRedeemable
