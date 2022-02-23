@@ -292,6 +292,7 @@ describe("vault", () => {
         program.programId
       );
 
+
     [depositAccountPda, depositAccountPdaBump] =
       await anchor.web3.PublicKey.findProgramAddress(
         [Buffer.from('deposits'), reserve.toBuffer(), vaultAuthority.toBuffer()],
@@ -315,6 +316,9 @@ describe("vault", () => {
         [Buffer.from('collateral'), reserve.toBuffer(), obligationPda.toBuffer(), vaultAuthority.toBuffer()],
         new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
       );
+
+      console.log("userRedeemable", userRedeemable)
+
 
     const depositVaultBumps: IDepositVaultBumps = {
       loanAccount: loanAccountPdaBump,

@@ -383,7 +383,7 @@ impl<'info> WithdrawVault<'info> {
         let cpi_accounts = CloseAccount {
             account: self.user_redeemable.to_account_info(),
             destination: self.user_authority.to_account_info(),
-            authority: self.vault_authority.to_account_info(),
+            authority: self.user_authority.to_account_info(),
         };
         let cpi_program = self.token_program.to_account_info();
         CpiContext::new_with_signer(cpi_program, cpi_accounts, signer)

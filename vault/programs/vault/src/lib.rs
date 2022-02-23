@@ -361,24 +361,27 @@ pub mod vault {
 
         msg!("after withdraw coll");
 
-        let cpi_accounts = Withdraw{
-            deposit_account: ctx.accounts.deposit_account.to_account_info(),
-            withdraw_account: ctx.accounts.vault_usdc.to_account_info(),
-            vault: ctx.accounts.jet_vault.to_account_info(),
-            deposit_note_mint: ctx.accounts.deposit_note_mint.to_account_info(),
-            market: ctx.accounts.market.to_account_info(),
-            market_authority: ctx.accounts.market_authority.to_account_info(),
-            token_program: ctx.accounts.token_program.to_account_info(),
-            depositor: ctx.accounts.vault_authority.to_account_info(),
-            jet_program: ctx.accounts.jet_program.to_account_info(),
-            reserve: ctx.accounts.reserve.to_account_info(),
-        };
-        msg!("About to withdraw ");
-        let cpi_program = ctx.accounts.jet_program.to_account_info();
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
-        withdraw(cpi_ctx, _bumps.deposit_account, Amount::from_tokens(usdc_to_repay_jet))?;
-       
-        msg!("after withdrawal");
+        // let cpi_accounts = Withdraw{
+        //     deposit_account: ctx.accounts.deposit_account.to_account_info(),
+        //     withdraw_account: ctx.accounts.vault_usdc.to_account_info(),
+        //     vault: ctx.accounts.jet_vault.to_account_info(),
+        //     deposit_note_mint: ctx.accounts.deposit_note_mint.to_account_info(),
+        //     market: ctx.accounts.market.to_account_info(),
+        //     market_authority: ctx.accounts.market_authority.to_account_info(),
+        //     token_program: ctx.accounts.token_program.to_account_info(),
+        //     depositor: ctx.accounts.vault_authority.to_account_info(),
+        //     jet_program: ctx.accounts.jet_program.to_account_info(),
+        //     reserve: ctx.accounts.reserve.to_account_info(),
+        // };
+        // msg!("About to withdraw jet program {}", ctx.accounts.jet_program.to_account_info().key().to_string());
+        // msg!("About to withdraw token_program program {}", ctx.accounts.token_program.to_account_info().key().to_string());
+
+        // let cpi_program = ctx.accounts.jet_program.to_account_info();
+        // let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
+        // withdraw(cpi_ctx, _bumps.deposit_account, Amount::from_tokens(usdc_to_repay_jet))?;
+        msg!("About to withdraw user account {}", ctx.accounts.user_authority.to_account_info().key().to_string());
+        msg!("after withdrawal vault authority {}", ctx.accounts.vault_authority.key().to_string());
+        msg!("after withdrawal account to close {}", ctx.accounts.user_redeemable.key().to_string());
         // Burn the user's redeemable tokens.
         token::burn(ctx.accounts.into_burn_context(signer), redeemable_amount)?;
 
