@@ -4,10 +4,10 @@ use anchor_spl::token::{self, Burn, CloseAccount, Mint, MintTo, Token, TokenAcco
 // use rust_decimal::prelude::*;
 use std::ops::Deref;
 // use jet::cpi::accounts::{InitializeObligation};
-use jet_proto_v1_cpi::{init_obligation, init_deposit_account, repay,
+use jet_proto_v1_cpi::{init_obligation, init_deposit_account, repay, withdraw,
     init_collateral_account, init_loan_account, deposit, refresh_reserve, borrow, deposit_collateral};
 use jet_proto_v1_cpi::accounts::*;
-use jet_proto_v1_cpi::{Amount, DepositCollateralBumpSeeds};
+use jet_proto_v1_cpi::{Amount, DepositCollateralBumpSeeds, WithdrawCollateralBumpSeeds};
 use std::cmp::min;
 use crate::context::*;
 
@@ -23,6 +23,10 @@ declare_id!("8KFe29BGwPevewGY147ytq2mSGuNVRtM4JaikvF6D26G");
 pub mod vault {
 
     // use std::borrow::Borrow;
+
+    // use std::borrow::Borrow;
+
+    use jet_proto_v1_cpi::withdraw_collateral;
 
     use super::*;
 
@@ -269,16 +273,16 @@ pub mod vault {
     #[access_control(deposit_withdraw_phase(&ctx.accounts.vault))]
     pub fn withdraw_vault(
         ctx: Context<WithdrawVault>,
-        _bump: u8,
+        _bumps: _WithdrawVaultBumps,
         redeemable_amount: u64,
     ) -> ProgramResult {
-        // msg!("Withdraw from vault");
-        // // While token::burn will check this, we prefer a verbose err msg.
-        // if ctx.accounts.user_redeemable.amount < redeemable_amount {
-        //     return Err(ErrorCode::InsufficientRedeemableBalance.into());
-        // }
+        msg!("Withdraw from vault {} wants to redeem {}", ctx.accounts.user_redeemable.amount, redeemable_amount );
+        // While token::burn will check this, we prefer a verbose err msg.
+        if ctx.accounts.user_redeemable.amount < redeemable_amount {
+            return Err(ErrorCode::InsufficientRedeemableBalance.into());
+        }
 
-        // let accounts = &ctx.accounts;
+        let accounts = &ctx.accounts;
         // Calculate USDC tokens due based on the redeem:usdc exchange rate P_z = ( N_u / N_z ).
         // n_u = P_z * n_z
 
@@ -287,51 +291,108 @@ pub mod vault {
         // .unwrap()
         // .checked_div(ctx.accounts.redeemable_mint.supply as u128)
         // .unwrap();
-        // let usdc_liabilities = accounts.vault_usdc_liabilities.amount;
-        // let usdc_equity = accounts.vault_usdc.amount + accounts.vault_usdc_collateral.amount - usdc_liabilities;
-        // let usdc_fx_rate = usdc_equity/accounts.redeemable_mint.supply;
-        // let usdc_to_send_user = redeemable_amount * usdc_fx_rate;
+        let usdc_liabilities = accounts.loan_account.amount;
+        let usdc_equity = accounts.vault_usdc.amount + accounts.collateral_account.amount - usdc_liabilities;
+        let usdc_fx_rate = usdc_equity/accounts.redeemable_mint.supply;
+        let usdc_to_send_user = redeemable_amount * usdc_fx_rate;
         
-        // let usdc_to_repay_jet = min(min(usdc_liabilities, usdc_to_send_user), accounts.vault_usdc.amount);
+        let usdc_to_repay_jet = min(min(usdc_liabilities, usdc_to_send_user), accounts.vault_usdc.amount);
 
-        // let vault_name = ctx.accounts.vault.vault_name.as_ref();
-        // let seeds = vault_authority_seeds!(
-        //     vault_name = vault_name,
-        //     bump = ctx.accounts.vault.bumps.vault_authority
-        // );
-        // let signer = &[&seeds[..]];
+        let vault_name = ctx.accounts.vault.vault_name.as_ref();
+        let seeds = vault_authority_seeds!(
+            vault_name = vault_name,
+            bump = ctx.accounts.vault.bumps.vault_authority
+        );
+        let signer = &[&seeds[..]];
 
-        // let cpi_accounts = Repay{
-        //     loan_account: ctx.accounts.loan_account.to_account_info(),
-        //     loan_note_mint: ctx.accounts.loan_note_mint.to_account_info(),
-        //     vault: ctx.accounts.jet_vault.to_account_info(),
-        //     receiver_account: ctx.accounts.vault_usdc.to_account_info(),
-        //     obligation: ctx.accounts.obligation.to_account_info(),
-        //     market: ctx.accounts.market.to_account_info(),
-        //     market_authority: ctx.accounts.market_authority.to_account_info(),
-        //     token_program: ctx.accounts.token_program.to_account_info(),
-        //     borrower: ctx.accounts.vault_authority.to_account_info(),
-        //     reserve: ctx.accounts.reserve.to_account_info(),
-        // };
+        {
+            let cpi_accounts = RefreshReserve{
+                deposit_note_mint: ctx.accounts.deposit_note_mint.to_account_info(),
+                market: ctx.accounts.market.to_account_info(),
+                market_authority: ctx.accounts.market_authority.to_account_info(),
+                token_program: ctx.accounts.token_program.to_account_info(),
+                reserve: ctx.accounts.reserve.to_account_info(),
+                fee_note_vault: ctx.accounts.fee_note_vault.to_account_info(),
+                pyth_oracle_price: ctx.accounts.pyth_price_oracle.to_account_info(),
+            };
 
-        // let cpi_program = ctx.accounts.jet_program.to_account_info();
-        // let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
-        // repay(cpi_ctx, bumps.loan_account, Amount::from_tokens(usdc_amount/2))
+            let cpi_program = ctx.accounts.jet_program.to_account_info();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
+            refresh_reserve(cpi_ctx,)?;
+        }
 
-        // // Burn the user's redeemable tokens.
-        // token::burn(ctx.accounts.into_burn_context(signer), redeemable_amount)?;
+        {
+            let cpi_accounts = Repay{
+                loan_account: ctx.accounts.loan_account.to_account_info(),
+                loan_note_mint: ctx.accounts.loan_note_mint.to_account_info(),
+                vault: ctx.accounts.jet_vault.to_account_info(),
+                payer_account: ctx.accounts.vault_usdc.to_account_info(),
+                obligation: ctx.accounts.obligation.to_account_info(),
+                market: ctx.accounts.market.to_account_info(),
+                market_authority: ctx.accounts.market_authority.to_account_info(),
+                token_program: ctx.accounts.token_program.to_account_info(),
+                payer: ctx.accounts.vault_authority.to_account_info(),
+                reserve: ctx.accounts.reserve.to_account_info(),
+            };
 
-        // // Transfer USDC from vault account to the user's usdc account.
-        // token::transfer(
-        //     ctx.accounts.into_transfer_context(signer),
-        //     usdc_to_send_user as u64,
-        // )?;
+            let cpi_program = ctx.accounts.jet_program.to_account_info();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
+            repay(cpi_ctx, Amount::from_tokens(usdc_to_repay_jet))?;
+        }
 
-        // // Send rent back to user if account is empty
-        // ctx.accounts.user_redeemable.reload()?;
-        // if ctx.accounts.user_redeemable.amount == 0 {
-        //     token::close_account(ctx.accounts.into_close_account_context(signer))?;
-        // }
+        let cpi_accounts = WithdrawCollateral{
+            collateral_account: ctx.accounts.collateral_account.to_account_info(),
+            deposit_account: ctx.accounts.deposit_account.to_account_info(),
+            obligation: ctx.accounts.obligation.to_account_info(),
+            market: ctx.accounts.market.to_account_info(),
+            market_authority: ctx.accounts.market_authority.to_account_info(),
+            token_program: ctx.accounts.token_program.to_account_info(),
+            owner: ctx.accounts.vault_authority.to_account_info(),
+            reserve: ctx.accounts.reserve.to_account_info(),
+        };
+        msg!("About to withdraw coll");
+        let cpi_program = ctx.accounts.jet_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
+        withdraw_collateral(cpi_ctx, WithdrawCollateralBumpSeeds{
+            collateral_account: _bumps.collateral_account,
+            deposit_account: _bumps.deposit_account,
+        }, Amount::from_tokens(usdc_to_repay_jet))?;
+
+
+        msg!("after withdraw coll");
+
+        let cpi_accounts = Withdraw{
+            deposit_account: ctx.accounts.deposit_account.to_account_info(),
+            withdraw_account: ctx.accounts.vault_usdc.to_account_info(),
+            vault: ctx.accounts.jet_vault.to_account_info(),
+            deposit_note_mint: ctx.accounts.deposit_note_mint.to_account_info(),
+            market: ctx.accounts.market.to_account_info(),
+            market_authority: ctx.accounts.market_authority.to_account_info(),
+            token_program: ctx.accounts.token_program.to_account_info(),
+            depositor: ctx.accounts.vault_authority.to_account_info(),
+            jet_program: ctx.accounts.jet_program.to_account_info(),
+            reserve: ctx.accounts.reserve.to_account_info(),
+        };
+        msg!("About to withdraw ");
+        let cpi_program = ctx.accounts.jet_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts,signer);
+        withdraw(cpi_ctx, _bumps.deposit_account, Amount::from_tokens(usdc_to_repay_jet))?;
+       
+        msg!("after withdrawal");
+        // Burn the user's redeemable tokens.
+        token::burn(ctx.accounts.into_burn_context(signer), redeemable_amount)?;
+
+        // Transfer USDC from vault account to the user's usdc account.
+        token::transfer(
+            ctx.accounts.into_transfer_context(signer),
+            usdc_to_send_user as u64,
+        )?;
+
+        // Send rent back to user if account is empty
+        ctx.accounts.user_redeemable.reload()?;
+        if ctx.accounts.user_redeemable.amount == 0 {
+            token::close_account(ctx.accounts.into_close_account_context(signer))?;
+        }
 
         Ok(())
     }

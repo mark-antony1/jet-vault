@@ -147,6 +147,10 @@ pub struct DepositVault<'info> {
         bump = vault.bumps.vault_usdc
     )]
     pub vault_usdc: Box<Account<'info, TokenAccount>>,
+    #[account(mut)]
+    pub collateral_account: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub loan_account: UncheckedAccount<'info>,
     //Jet Accounts 
     #[account(mut)]
     pub market: UncheckedAccount<'info>,
@@ -165,11 +169,7 @@ pub struct DepositVault<'info> {
     #[account(mut)]
     pub deposit_note_mint: UncheckedAccount<'info>,
     #[account(mut)]
-    pub collateral_account: UncheckedAccount<'info>,
-    #[account(mut)]
     pub loan_note_mint: UncheckedAccount<'info>,
-    #[account(mut)]
-    pub loan_account: UncheckedAccount<'info>,
     #[account(mut)]
     pub obligation: UncheckedAccount<'info>,
     // Programs and Sysvars
@@ -178,7 +178,7 @@ pub struct DepositVault<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(bump: u8)]
+#[instruction(bumps: _WithdrawVaultBumps)]
 pub struct WithdrawVault<'info> {
     // User Accounts
     #[account(mut)]
@@ -194,7 +194,7 @@ pub struct WithdrawVault<'info> {
         seeds = [USER_REDEEMABLE_SEED.as_bytes(),
             vault.vault_name.as_ref().strip(),
             user_authority.key().as_ref()],
-        bump = bump
+        bump = bumps.user_redeemable_account
     )]
     pub user_redeemable: Box<Account<'info, TokenAccount>>,
     // vault Accounts
@@ -222,12 +222,34 @@ pub struct WithdrawVault<'info> {
         bump = vault.bumps.vault_usdc
     )]
     pub vault_usdc: Box<Account<'info, TokenAccount>>,
+    #[account(mut)]
+    pub collateral_account: Box<Account<'info, TokenAccount>>,
+    #[account(mut)]
+    pub loan_account: Box<Account<'info, TokenAccount>>,
+    #[account(mut)]
+    pub deposit_account: UncheckedAccount<'info>,
+    //Jet Accounts 
+    #[account(mut)]
+    pub market: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub reserve: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub market_authority: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub jet_vault: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub loan_note_mint: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub obligation: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub fee_note_vault: UncheckedAccount<'info>,
     #[account()]
-    pub vault_usdc_collateral: Box<Account<'info, TokenAccount>>,
-    #[account()]
-    pub vault_usdc_liabilities: Box<Account<'info, TokenAccount>>,
+    pub pyth_price_oracle: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub deposit_note_mint: UncheckedAccount<'info>,
     // Programs and Sysvars
     pub token_program: Program<'info, Token>,
+    pub jet_program: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -289,6 +311,16 @@ pub struct _DepositVaultBumps {
     pub collateral_account: u8,
     pub obligation: u8,
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Default, Clone)]
+pub struct _WithdrawVaultBumps {
+    pub loan_account: u8,
+    pub deposit_account: u8,
+    pub user_redeemable_account: u8,
+    pub collateral_account: u8,
+    pub obligation: u8,
+}
+
 
 // CPI context traits
 

@@ -3,7 +3,7 @@ import * as anchor from "@project-serum/anchor";
 import { Vault } from "../target/types/vault";
 import { TOKEN_PROGRAM_ID, Token } from "@solana/spl-token";
 import assert from "assert";
-import { sleep, IVaultBumps, IDepositVaultBumps, IEpochTimes } from "./utils";
+import { sleep, IVaultBumps, IDepositVaultBumps, IEpochTimes, IWithdrawVaultBumps } from "./utils";
 import {
   Network,
   utils as zetaUtils,
@@ -249,10 +249,10 @@ describe("vault", () => {
   let userUsdc: anchor.web3.PublicKey;
   const firstDeposit = 4000;
 
-  it("Exchanges user USDC for redeemable tokens", async () => {
+  it("Deposits user USDC in exchange for redeemable tokens", async () => {
     // Wait until the vault has opened.
     if (Date.now() < epochTimes.startEpoch.toNumber() * 1000) {
-      await sleep(epochTimes.startEpoch.toNumber() * 1000 - Date.now() + 2000);
+      await sleep(epochTimes.startEpoch.toNumber() * 1000 - Date.now() + 1000);
     }
 
     userUsdc = await usdcMintAccount.createAssociatedTokenAccount(
@@ -370,13 +370,12 @@ describe("vault", () => {
       }
     );
 
-    console.log("returns from deposit")
 
     // Check that USDC is in vault and user has received their redeem tokens in return
     let vaultUsdcAccount = await usdcMintAccount.getAccountInfo(vaultUsdc);
     assert.equal(
       vaultUsdcAccount.amount,
-      firstDeposit/2
+      firstDeposit*.6
     );
     let userRedeemableAccount = await redeemableMintAccount.getAccountInfo(
       userRedeemable
@@ -388,7 +387,7 @@ describe("vault", () => {
   });
 
   // const secondDeposit = 420;
-  // let totalVaultUsdc, secondUserKeypair, secondUserUsdc;
+  let totalVaultUsdc, secondUserKeypair, secondUserUsdc;
 
   // it("Exchanges a second users USDC for redeemable tokens", async () => {
   //   secondUserKeypair = anchor.web3.Keypair.generate();
@@ -479,41 +478,102 @@ describe("vault", () => {
 
   // // Withdraw Phase
 
-  // const firstWithdrawal = 2;
+  const firstWithdrawal = 4000;
 
-  // it("Exchanges user Redeemable tokens for USDC", async () => {
-  //   if (Date.now() < epochTimes.startEpoch.toNumber() * 1000) {
-  //     await sleep(epochTimes.startEpoch.toNumber() * 1000 - Date.now() + 3000);
-  //   }
-  //   await program.rpc.withdrawVault(
-  //     userRedeemableBump,
-  //     new anchor.BN(zetaUtils.convertDecimalToNativeInteger(firstWithdrawal)),
-  //     {
-  //       accounts: {
-  //         userAuthority: userKeypair.publicKey,
-  //         userUsdc,
-  //         userRedeemable,
-  //         vault,
-  //         vaultAuthority,
-  //         usdcMint,
-  //         redeemableMint,
-  //         vaultUsdc,
-  //         tokenProgram: TOKEN_PROGRAM_ID,
-  //       },
-  //       signers: [userKeypair],
-  //     }
-  //   );
+  it("Exchanges user Redeemable tokens for USDC", async () => {
+    if (Date.now() < epochTimes.startEpoch.toNumber() * 1000) {
+      await sleep(epochTimes.startEpoch.toNumber() * 1000 - Date.now() + 1000);
+    }
 
-  //   totalVaultUsdc = totalVaultUsdc - firstWithdrawal;
-  //   let vaultUsdcAccount = await usdcMintAccount.getAccountInfo(vaultUsdc);
-  //   assert.equal(
-  //     zetaUtils.convertNativeBNToDecimal(vaultUsdcAccount.amount),
-  //     totalVaultUsdc
-  //   );
-  //   let userUsdcAccount = await usdcMintAccount.getAccountInfo(userUsdc);
-  //   assert.equal(
-  //     zetaUtils.convertNativeBNToDecimal(userUsdcAccount.amount),
-  //     firstWithdrawal
-  //   );
-  // });
+    [userRedeemable, userRedeemableBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [
+          Buffer.from("user-redeemable"),
+          Buffer.from(vaultName),
+          userKeypair.publicKey.toBuffer(),
+        ],
+        program.programId
+      );
+
+    [depositAccountPda, depositAccountPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('deposits'), reserve.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    [obligationPda, obligationPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('obligation'), market.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    [loanAccountPda, loanAccountPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('loan'), reserve.toBuffer(), obligationPda.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    [collateralAccountPda, collateralAccountPdaBump] =
+      await anchor.web3.PublicKey.findProgramAddress(
+        [Buffer.from('collateral'), reserve.toBuffer(), obligationPda.toBuffer(), vaultAuthority.toBuffer()],
+        new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+      );
+
+    const withdrawVaultBumps : IWithdrawVaultBumps = {
+      loanAccount: loanAccountPdaBump,
+      depositAccount: depositAccountPdaBump,
+      collateralAccount: collateralAccountPdaBump,
+      userRedeemableAccount: userRedeemableBump,
+      obligation: obligationPdaBump
+    }
+    console.log("token program", TOKEN_PROGRAM_ID.toString())
+    // console.log("jet program", jetProgram)
+
+
+    await program.rpc.withdrawVault(
+      withdrawVaultBumps,
+      new anchor.BN(firstWithdrawal),
+      {
+        accounts: {
+          userAuthority: userKeypair.publicKey,
+          userUsdc,
+          userRedeemable,
+          vault,
+          vaultAuthority,
+          usdcMint,
+          redeemableMint,
+          vaultUsdc,
+          //Jet PDAs
+          obligation: obligationPda,
+          collateralAccount: collateralAccountPda,
+          loanAccount: loanAccountPda,
+          depositAccount: depositAccountPda,
+          //Jet accounts
+          depositNoteMint: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.depositNoteMint),
+          feeNoteVault: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.feeNoteVault),
+          pythPriceOracle: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.pythPrice),
+          loanNoteMint: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.loanNoteMint),
+          market: new anchor.web3.PublicKey(jetMetadata.market.market),
+          jetVault: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.vault),
+          reserve: new anchor.web3.PublicKey(jetMetadata.reserves[0].accounts.reserve),
+          marketAuthority: new anchor.web3.PublicKey(jetMetadata.market.marketAuthority),
+          tokenProgram: TOKEN_PROGRAM_ID,
+          jetProgram: new anchor.web3.PublicKey("JPv1rCqrhagNNmJVM5J1he7msQ5ybtvE1nNuHpDHMNU")
+        },
+        signers: [userKeypair],
+      }
+    );
+
+    totalVaultUsdc = firstDeposit - firstWithdrawal;
+    let vaultUsdcAccount = await usdcMintAccount.getAccountInfo(vaultUsdc);
+    assert.equal(
+      zetaUtils.convertNativeBNToDecimal(vaultUsdcAccount.amount),
+      totalVaultUsdc
+    );
+    let userUsdcAccount = await usdcMintAccount.getAccountInfo(userUsdc);
+    assert.equal(
+      zetaUtils.convertNativeBNToDecimal(userUsdcAccount.amount),
+      firstWithdrawal
+    );
+  });
 });

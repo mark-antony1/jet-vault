@@ -671,7 +671,7 @@ dependencies = [
 [[package]]
 name = "jet-proto-v1-cpi"
 version = "0.21.0"
-source = "git+https://github.com/jet-lab/jet-v1?branch=cpi-library#65249850db37c0fdc6ed84ef0fe2fc0c75fcebc8"
+source = "git+https://github.com/jet-lab/jet-v1?branch=cpi-library#74b27d7c7e5c4a2d2f3189dead6065d2c5b56c85"
 dependencies = [
  "anchor-lang",
  "borsh",
